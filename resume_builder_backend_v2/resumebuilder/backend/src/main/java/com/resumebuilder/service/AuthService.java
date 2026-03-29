@@ -124,6 +124,8 @@ public class AuthService {
     @Transactional
     public AuthResponse googleLogin(GoogleLoginRequest request) {
         try {
+            System.out.println("DEBUG TOKEN RECEIVED: " + request.getIdToken().substring(0, 50));
+            System.out.println("DEBUG CLIENT ID: " + googleClientId);
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(), GsonFactory.getDefaultInstance())
                     .setAudience(Collections.singletonList(googleClientId))

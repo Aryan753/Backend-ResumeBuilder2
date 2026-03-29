@@ -22,9 +22,6 @@ public class PdfService {
     private static final Logger log = LoggerFactory.getLogger(PdfService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Extract text from uploaded PDF file
-     */
     public String extractTextFromPdf(MultipartFile file) {
         try (PDDocument document = PDDocument.load(file.getInputStream())) {
             PDFTextStripper stripper = new PDFTextStripper();
@@ -36,9 +33,6 @@ public class PdfService {
         }
     }
 
-    /**
-     * Generate PDF bytes from resume data JSON + template ID
-     */
     public byte[] generatePdf(String resumeDataJson, String templateId) {
         try {
             JsonNode data = objectMapper.readTree(resumeDataJson);
@@ -91,17 +85,14 @@ public class PdfService {
               .exp-date { color: #666; font-size: 10px; white-space: nowrap; }
               ul { padding-left: 16px; margin-top: 4px; }
               ul li { margin-bottom: 2px; line-height: 1.4; }
-              .skills-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-              .skill-tag { background: #e8f0fe; color: #1a3a5c; padding: 3px 10px;
-                border-radius: 12px; font-size: 10px; }
+              .skill-row { margin-bottom: 5px; font-size: 11px; color: #333; }
+              .skill-label { font-weight: bold; color: #1a3a5c; }
               .edu-item { display: flex; justify-content: space-between; margin-bottom: 8px; }
               .summary { line-height: 1.6; color: #333; }
-              .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
               .cert-item { margin-bottom: 6px; }
             </style></head><body>
             """);
 
-        // Header
         sb.append("<div class='header'>");
         sb.append("<h1>").append(safe(pi, "name")).append("</h1>");
         sb.append("<div class='contact'>");
@@ -114,14 +105,12 @@ public class PdfService {
 
         sb.append("<div class='body'>");
 
-        // Summary
         String summary = d.path("summary").asText("");
         if (!summary.isEmpty()) {
             sb.append("<div class='section'><div class='section-title'>Professional Summary</div>");
             sb.append("<p class='summary'>").append(summary).append("</p></div>");
         }
 
-        // Experience
         JsonNode exp = d.path("experience");
         if (exp.isArray() && exp.size() > 0) {
             sb.append("<div class='section'><div class='section-title'>Work Experience</div>");
@@ -147,7 +136,6 @@ public class PdfService {
             sb.append("</div>");
         }
 
-        // Education
         JsonNode edu = d.path("education");
         if (edu.isArray() && edu.size() > 0) {
             sb.append("<div class='section'><div class='section-title'>Education</div>");
@@ -164,18 +152,17 @@ public class PdfService {
             sb.append("</div>");
         }
 
-        // Skills
+        // Skills — category wise
         JsonNode skills = d.path("skills");
         if (!skills.isMissingNode()) {
-            sb.append("<div class='section'><div class='section-title'>Skills</div><div class='skills-grid'>");
-            appendSkillTags(sb, skills.path("technical"));
-            appendSkillTags(sb, skills.path("tools"));
-            appendSkillTags(sb, skills.path("soft"));
-            appendSkillTags(sb, skills.path("languages"));
-            sb.append("</div></div>");
+            sb.append("<div class='section'><div class='section-title'>Skills</div>");
+            appendCategorySkills(sb, skills.path("technical"), "Technical Skills");
+            appendCategorySkills(sb, skills.path("tools"), "Tools");
+            appendCategorySkills(sb, skills.path("soft"), "Soft Skills");
+            appendCategorySkills(sb, skills.path("languages"), "Languages");
+            sb.append("</div>");
         }
 
-        // Projects
         JsonNode projects = d.path("projects");
         if (projects.isArray() && projects.size() > 0) {
             sb.append("<div class='section'><div class='section-title'>Projects</div>");
@@ -198,7 +185,6 @@ public class PdfService {
             sb.append("</div>");
         }
 
-        // Certifications
         JsonNode certs = d.path("certifications");
         if (certs.isArray() && certs.size() > 0) {
             sb.append("<div class='section'><div class='section-title'>Certifications</div>");
@@ -244,6 +230,8 @@ public class PdfService {
               ul { padding-left: 16px; } ul li { margin-bottom: 2px; line-height: 1.4; }
               .edu-degree { font-weight: bold; }
               .contact-item { font-size: 9.5px; margin-bottom: 5px; color: #ccc; word-break: break-all; }
+              .skill-row { margin-bottom: 5px; font-size: 9.5px; color: #ccc; }
+              .skill-label { font-weight: bold; color: #f0a500; }
             </style></head><body>
             """);
 
@@ -263,15 +251,10 @@ public class PdfService {
 
         JsonNode skills = d.path("skills");
         if (!skills.isMissingNode()) {
-            sb.append("<div class='section-title'>Technical Skills</div>");
-            for (JsonNode s : skills.path("technical")) {
-                sb.append("<div class='skill-bar'><div class='skill-name'>").append(s.asText()).append("</div>")
-                        .append("<div class='bar'><div class='bar-fill' style='width:80%'></div></div></div>");
-            }
-            sb.append("<div class='section-title'>Tools</div>");
-            for (JsonNode s : skills.path("tools")) {
-                sb.append("<p style='margin-bottom:3px;'>• ").append(s.asText()).append("</p>");
-            }
+            sb.append("<div class='section-title'>Skills</div>");
+            appendCategorySkillsDark(sb, skills.path("technical"), "Technical");
+            appendCategorySkillsDark(sb, skills.path("tools"), "Tools");
+            appendCategorySkillsDark(sb, skills.path("soft"), "Soft Skills");
         }
 
         JsonNode certs = d.path("certifications");
@@ -282,7 +265,7 @@ public class PdfService {
                         .append("</strong><br><span style='color:#aaa'>").append(safe(c, "issuer")).append("</span></p>");
             }
         }
-        sb.append("</div>"); // end sidebar
+        sb.append("</div>");
 
         sb.append("<div class='main'>");
         String summary = d.path("summary").asText("");
@@ -358,7 +341,8 @@ public class PdfService {
               .exp-company { color: #555; margin: 2px 0; }
               ul { padding-left: 18px; margin-top: 4px; }
               ul li { margin-bottom: 3px; line-height: 1.5; }
-              .skills { color: #444; line-height: 1.8; }
+              .skill-row { margin-bottom: 5px; font-size: 11px; }
+              .skill-label { font-weight: bold; color: #555; }
               .edu-item { display: flex; justify-content: space-between; margin-bottom: 10px; }
             </style></head><body>
             """);
@@ -383,9 +367,10 @@ public class PdfService {
         JsonNode skills = d.path("skills");
         if (!skills.isMissingNode()) {
             sb.append("<div class='section-title'>Skills</div><hr>");
-            sb.append("<div class='skills'>");
-            appendFlatSkills(sb, skills);
-            sb.append("</div>");
+            appendCategorySkills(sb, skills.path("technical"), "Technical Skills");
+            appendCategorySkills(sb, skills.path("tools"), "Tools");
+            appendCategorySkills(sb, skills.path("soft"), "Soft Skills");
+            appendCategorySkills(sb, skills.path("languages"), "Languages");
         }
 
         appendProjectsSection(sb, d);
@@ -415,10 +400,9 @@ public class PdfService {
               .exp-meta { color: #666; font-size: 10px; margin: 2px 0; }
               ul { padding-left: 14px; margin-top: 4px; }
               ul li { margin-bottom: 2px; line-height: 1.4; }
-              .tag { background:#e8f8ef; color:#1b6b3a; padding:2px 8px; border-radius:10px;
-                font-size:10px; display:inline-block; margin:2px; border: 1px solid #b8e8c8; }
+              .skill-row { margin-bottom: 5px; font-size: 11px; color: #333; }
+              .skill-label { font-weight: bold; color: #1b6b3a; }
               .edu-item { padding: 8px; background:#f9fffe; border:1px solid #cde8d4; border-radius:4px; margin-bottom:8px; }
-              .two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
             </style></head><body>
             """);
 
@@ -442,11 +426,11 @@ public class PdfService {
 
         JsonNode skills = d.path("skills");
         if (!skills.isMissingNode()) {
-            sb.append("<div class='section-title'>Skills & Technologies</div><div>");
-            for (JsonNode s : skills.path("technical")) sb.append("<span class='tag'>").append(s.asText()).append("</span>");
-            for (JsonNode s : skills.path("tools")) sb.append("<span class='tag'>").append(s.asText()).append("</span>");
-            for (JsonNode s : skills.path("soft")) sb.append("<span class='tag'>").append(s.asText()).append("</span>");
-            sb.append("</div>");
+            sb.append("<div class='section-title'>Skills &amp; Technologies</div>");
+            appendCategorySkills(sb, skills.path("technical"), "Technical Skills");
+            appendCategorySkills(sb, skills.path("tools"), "Tools");
+            appendCategorySkills(sb, skills.path("soft"), "Soft Skills");
+            appendCategorySkills(sb, skills.path("languages"), "Languages");
         }
 
         appendProjectsSection(sb, d);
@@ -466,7 +450,6 @@ public class PdfService {
               .header { background:#111; color:#fff; padding: 30px 36px; display:flex; justify-content:space-between; align-items:center; }
               .header h1 { font-size: 26px; letter-spacing: 3px; }
               .header .contact { font-size: 10px; color: #ccc; text-align:right; line-height:1.8; }
-              .accent { color: #c9a84c; }
               .body { padding: 20px 36px; }
               .section-title { font-size: 11px; font-weight: bold; text-transform: uppercase;
                 letter-spacing: 3px; color: #111; margin: 18px 0 8px;
@@ -478,7 +461,8 @@ public class PdfService {
               .exp-company { color: #555; margin: 2px 0; font-style:italic; }
               ul { padding-left: 18px; margin-top: 4px; }
               ul li { margin-bottom: 3px; line-height: 1.5; }
-              .skill-line { color: #444; margin-bottom: 4px; }
+              .skill-row { margin-bottom: 5px; font-size: 11px; color: #333; }
+              .skill-label { font-weight: bold; color: #111; }
               .edu-item { display:flex; justify-content:space-between; margin-bottom:10px; }
             </style></head><body>
             """);
@@ -506,7 +490,10 @@ public class PdfService {
         JsonNode skills = d.path("skills");
         if (!skills.isMissingNode()) {
             sb.append("<div class='section-title'>Core Competencies</div>");
-            appendFlatSkillsInline(sb, skills);
+            appendCategorySkills(sb, skills.path("technical"), "Technical Skills");
+            appendCategorySkills(sb, skills.path("tools"), "Tools");
+            appendCategorySkills(sb, skills.path("soft"), "Soft Skills");
+            appendCategorySkills(sb, skills.path("languages"), "Languages");
         }
 
         appendProjectsSection(sb, d);
@@ -515,6 +502,35 @@ public class PdfService {
     }
 
     // ===== Shared helpers =====
+
+    // Category-wise skills: "Technical Skills: Java, Spring Boot, SQL"
+    private void appendCategorySkills(StringBuilder sb, JsonNode arr, String label) {
+        if (!arr.isArray() || arr.size() == 0) return;
+        StringBuilder vals = new StringBuilder();
+        for (JsonNode s : arr) {
+            if (vals.length() > 0) vals.append(", ");
+            vals.append(s.asText());
+        }
+        sb.append("<div class='skill-row'>")
+                .append("<span class='skill-label'>").append(label).append(": </span>")
+                .append(vals)
+                .append("</div>");
+    }
+
+    // Same but for dark sidebar (Template 2)
+    private void appendCategorySkillsDark(StringBuilder sb, JsonNode arr, String label) {
+        if (!arr.isArray() || arr.size() == 0) return;
+        StringBuilder vals = new StringBuilder();
+        for (JsonNode s : arr) {
+            if (vals.length() > 0) vals.append(", ");
+            vals.append(s.asText());
+        }
+        sb.append("<div class='skill-row'>")
+                .append("<span class='skill-label'>").append(label).append(": </span>")
+                .append(vals)
+                .append("</div>");
+    }
+
     private void appendExpSection(StringBuilder sb, JsonNode d) {
         JsonNode exp = d.path("experience");
         if (!exp.isArray() || exp.size() == 0) return;
@@ -573,25 +589,6 @@ public class PdfService {
             sb.append("<p style='margin-top:3px;line-height:1.5;'>").append(safe(p, "description")).append("</p>");
             sb.append("</div>");
         }
-    }
-
-    private void appendSkillTags(StringBuilder sb, JsonNode arr) {
-        if (arr.isArray()) for (JsonNode s : arr)
-            sb.append("<span class='skill-tag'>").append(s.asText()).append("</span>");
-    }
-
-    private void appendFlatSkills(StringBuilder sb, JsonNode skills) {
-        StringBuilder all = new StringBuilder();
-        for (JsonNode s : skills.path("technical")) { if (all.length()>0) all.append(" • "); all.append(s.asText()); }
-        for (JsonNode s : skills.path("tools")) { if (all.length()>0) all.append(" • "); all.append(s.asText()); }
-        for (JsonNode s : skills.path("soft")) { if (all.length()>0) all.append(" • "); all.append(s.asText()); }
-        sb.append(all);
-    }
-
-    private void appendFlatSkillsInline(StringBuilder sb, JsonNode skills) {
-        sb.append("<p style='color:#444;line-height:2;'>");
-        appendFlatSkills(sb, skills);
-        sb.append("</p>");
     }
 
     private void appendContact(StringBuilder sb, JsonNode pi, String field, String prefix) {
